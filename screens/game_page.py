@@ -4,15 +4,20 @@ from dataclasses import dataclass
 
 import pygame
 
+from components.button import draw_outline_button
 from components.modal_elements import (
     draw_backdrop,
     draw_decorated_panel,
+    draw_language_box,
     draw_modal_button,
-    draw_option_pill,
+    draw_panel_header,
+    draw_qr_placeholder,
+    draw_sound_state_icon,
+    draw_toggle_switch,
     wrap_text,
 )
 from components.setting_icon import draw_gear_icon
-from config import BLACK, BORDER_PINK, LIGHT_PINK, WHITE
+from config import BLACK, BORDER_PINK, WHITE
 from core.AI import AI_DIFFICULTY_SETTINGS, get_ai_move
 from core.board import (
     COLS,
@@ -23,6 +28,7 @@ from core.board import (
     get_next_open_row,
     is_valid_column,
 )
+from core.ui_fonts import get_ui_font
 
 
 REFERENCE_SCREEN_WIDTH = 734
@@ -84,6 +90,14 @@ class GamePage:
         self.btn_restart = None
         self.btn_settings = None
         self.active_modal = None
+        self.modal_parent = None
+        self.settings_draft_language = self.preferences.language
+        self.settings_draft_volume = self.preferences.volume_on
+        self.settings_dropdown_open = False
+        self.settings_buttons = {}
+        self.about_exit_button = None
+        self.donate_exit_button = None
+        self.win_buttons = {}
         self.reset(difficulty)
 
     def reset(self, difficulty=None, game_mode=None):
@@ -104,9 +118,37 @@ class GamePage:
         self.last_tick_ms = pygame.time.get_ticks()
         self.show_reset_confirmation = False
         self.active_modal = None
+        self.modal_parent = None
+        self.settings_dropdown_open = False
+        self.reset_overlay_rects()
+
+    def reset_overlay_rects(self):
+        self.settings_buttons = {}
+        self.about_exit_button = None
+        self.donate_exit_button = None
+        self.win_buttons = {}
+
+    def sx(self, x):
+        return int(x * self.screen.get_width() / 1440)
+
+    def sy(self, y):
+        return int(y * self.screen.get_height() / 1024)
+
+    def sf(self, size):
+        scale_w = self.screen.get_width() / 1440
+        scale_h = self.screen.get_height() / 1024
+        return max(16, int(size * min(scale_w, scale_h)))
+
+    def make_centered_rect(self, width_ratio, height_ratio, top_ratio=None):
+        width = int(self.screen.get_width() * width_ratio)
+        height = int(self.screen.get_height() * height_ratio)
+        x = (self.screen.get_width() - width) // 2
+        y = (self.screen.get_height() - height) // 2 if top_ratio is None else int(self.screen.get_height() * top_ratio)
+        return pygame.Rect(x, y, width, height)
 
     def draw(self):
         self._update_runtime_state()
+        self.reset_overlay_rects()
 
         layout = self._compute_layout()
         mouse_pos = pygame.mouse.get_pos()
@@ -120,10 +162,18 @@ class GamePage:
         self._draw_board(layout)
         self._draw_turn_panel(layout)
 
+        if self.active_modal:
+            draw_backdrop(self.screen, 128)
+            if self.active_modal == "settings":
+                self._draw_settings_modal(layout, mouse_pos)
+            elif self.active_modal == "about":
+                self._draw_about_modal()
+            elif self.active_modal == "donate":
+                self._draw_donate_modal()
+
         if self.game_over:
+            draw_backdrop(self.screen, 146)
             self._draw_winner_popup(layout, mouse_pos)
-        if self.active_modal == "settings":
-            self._draw_settings_modal(layout, mouse_pos)
         if self.show_reset_confirmation:
             self._draw_reset_confirmation(layout, mouse_pos)
 
@@ -140,6 +190,9 @@ class GamePage:
 
         if self.active_modal == "settings":
             self._handle_settings_click(layout, mouse_pos)
+            return None
+        if self.active_modal in {"about", "donate"}:
+            self._handle_info_modal_click(mouse_pos)
             return None
 
         if self.game_over:
@@ -178,7 +231,7 @@ class GamePage:
         elapsed = (now - self.last_tick_ms) / 1000 if self.last_tick_ms is not None else 0
         self.last_tick_ms = now
 
-        if self.show_reset_confirmation or self.active_modal == "settings":
+        if self.show_reset_confirmation or self.active_modal:
             return
 
         if self.game_over:
@@ -227,11 +280,25 @@ class GamePage:
 
     def _open_settings_modal(self):
         self.active_modal = "settings"
+        self.modal_parent = None
+        self.settings_draft_language = self.preferences.language
+        self.settings_draft_volume = self.preferences.volume_on
+        self.settings_dropdown_open = False
         if self._is_ai_turn():
             self.ai_turn_started_at = pygame.time.get_ticks()
 
     def _close_settings_modal(self):
-        self.active_modal = None
+        self._close_active_modal()
+
+    def _open_info_modal(self, modal_name):
+        self.modal_parent = self.active_modal
+        self.active_modal = modal_name
+        self.settings_dropdown_open = False
+
+    def _close_active_modal(self):
+        self.active_modal = self.modal_parent
+        self.modal_parent = None
+        self.settings_dropdown_open = False
         self.last_tick_ms = pygame.time.get_ticks()
         if self._is_ai_turn():
             self.ai_turn_started_at = self.last_tick_ms
@@ -686,125 +753,289 @@ class GamePage:
             font_size=max(15, int(17 * layout["scale"])),
         )
 
-    def _get_settings_rects(self, layout):
-        panel_width = max(320, int(340 * layout["scale"]))
-        panel_height = max(220, int(240 * layout["scale"]))
-        panel = pygame.Rect(
-            (layout["screen_width"] - panel_width) // 2,
-            (layout["screen_height"] - panel_height) // 2,
-            panel_width,
-            panel_height,
-        )
-
-        option_width = max(110, int(118 * layout["scale"]))
-        option_height = max(42, int(46 * layout["scale"]))
-        gap = max(12, int(14 * layout["scale"]))
-        option_y = panel.top + max(104, int(112 * layout["scale"]))
-        english_button = pygame.Rect(
-            panel.centerx - gap - option_width,
-            option_y,
-            option_width,
-            option_height,
-        )
-        vietnamese_button = pygame.Rect(
-            panel.centerx + gap,
-            option_y,
-            option_width,
-            option_height,
-        )
-        close_button = pygame.Rect(
-            panel.centerx - max(78, int(82 * layout["scale"])),
-            panel.bottom - max(64, int(68 * layout["scale"])),
-            max(156, int(164 * layout["scale"])),
-            max(42, int(46 * layout["scale"])),
-        )
-
-        return {
-            "panel": panel,
-            "english_button": english_button,
-            "vietnamese_button": vietnamese_button,
-            "close_button": close_button,
-        }
-
     def _draw_settings_modal(self, layout, mouse_pos):
-        rects = self._get_settings_rects(layout)
-        panel = rects["panel"]
-
-        draw_backdrop(self.screen)
-        draw_decorated_panel(self.screen, panel)
-
-        title_font = pygame.font.SysFont("timesnewroman", max(28, int(34 * layout["scale"])), bold=True)
-        label_font = pygame.font.SysFont("segoeui", max(18, int(20 * layout["scale"])), bold=True)
-        hint_font = pygame.font.SysFont("segoeui", max(14, int(15 * layout["scale"])))
-
-        title = title_font.render(self.preferences.text("settings_title"), True, TEXT)
-        label = label_font.render(self.preferences.text("settings_language"), True, TEXT)
-        hint = hint_font.render(self.preferences.text("settings_saved"), True, SUBTEXT)
-
-        self.screen.blit(title, title.get_rect(center=(panel.centerx, panel.top + max(32, int(36 * layout["scale"])))))
-        self.screen.blit(label, label.get_rect(center=(panel.centerx, panel.top + max(72, int(76 * layout["scale"])))))
-        self.screen.blit(hint, hint.get_rect(center=(panel.centerx, panel.bottom - max(84, int(88 * layout["scale"])))))
-
-        draw_option_pill(
+        panel_rect = self.make_centered_rect(0.58, 0.74, 0.10)
+        draw_decorated_panel(
             self.screen,
-            rects["english_button"],
-            self.preferences.text("language_en"),
-            active=self.preferences.language == "en",
-            hovered=rects["english_button"].collidepoint(mouse_pos),
-            font_size=max(16, int(16 * layout["scale"])),
+            panel_rect,
+            outer_width=max(3, self.sx(4)),
+            inner_margin=max(16, self.sx(20)),
+            inner_width=max(2, self.sx(2)),
         )
-        draw_option_pill(
-            self.screen,
-            rects["vietnamese_button"],
-            self.preferences.text("language_vi"),
-            active=self.preferences.language == "vi",
-            hovered=rects["vietnamese_button"].collidepoint(mouse_pos),
-            font_size=max(16, int(16 * layout["scale"])),
+        header_font = get_ui_font(self.sf(42), bold=True)
+        draw_panel_header(self.screen, panel_rect, self.preferences.text("settings_title"), header_font)
+
+        label_font = get_ui_font(self.sf(18), bold=True)
+        icon_center = (panel_rect.left + int(panel_rect.w * 0.20), panel_rect.top + int(panel_rect.h * 0.30))
+        draw_sound_state_icon(self.screen, icon_center, max(40, panel_rect.w // 11), self.settings_draft_volume)
+
+        volume_label = label_font.render(self.preferences.text("settings_volume"), True, BLACK)
+        volume_label_rect = volume_label.get_rect(midleft=(panel_rect.left + int(panel_rect.w * 0.30), panel_rect.top + int(panel_rect.h * 0.24)))
+        self.screen.blit(volume_label, volume_label_rect)
+
+        volume_rect = pygame.Rect(
+            panel_rect.left + int(panel_rect.w * 0.30),
+            panel_rect.top + int(panel_rect.h * 0.28),
+            int(panel_rect.w * 0.20),
+            int(panel_rect.h * 0.08),
         )
-        draw_modal_button(
+        draw_toggle_switch(self.screen, volume_rect, self.settings_draft_volume)
+        self.settings_buttons["volume"] = volume_rect
+
+        language_label = label_font.render(self.preferences.text("settings_language"), True, BLACK)
+        language_label_rect = language_label.get_rect(midleft=(panel_rect.left + int(panel_rect.w * 0.55), panel_rect.top + int(panel_rect.h * 0.24)))
+        self.screen.blit(language_label, language_label_rect)
+
+        language_rect = pygame.Rect(
+            panel_rect.left + int(panel_rect.w * 0.55),
+            panel_rect.top + int(panel_rect.h * 0.26),
+            int(panel_rect.w * 0.28),
+            int(panel_rect.h * 0.10),
+        )
+        language_font = get_ui_font(self.sf(20), bold=False)
+        draw_language_box(
             self.screen,
-            rects["close_button"],
-            self.preferences.text("settings_close"),
-            hovered=rects["close_button"].collidepoint(mouse_pos),
-            fill_color=LIGHT_PINK,
-            border_color=BORDER_PINK,
-            text_color=BLACK,
-            font_size=max(16, int(17 * layout["scale"])),
+            language_rect,
+            self.preferences.language_label(self.settings_draft_language).upper(),
+            language_font,
+        )
+        self.settings_buttons["language_box"] = language_rect
+
+        button_width = int(panel_rect.w * 0.32)
+        button_height = int(panel_rect.h * 0.12)
+        left_x = panel_rect.left + int(panel_rect.w * 0.12)
+        right_x = panel_rect.right - button_width - int(panel_rect.w * 0.12)
+        top_row_y = panel_rect.top + int(panel_rect.h * 0.56)
+        bottom_row_y = panel_rect.top + int(panel_rect.h * 0.74)
+        button_font_size = self.sf(28)
+
+        self.settings_buttons["about"] = draw_outline_button(
+            self.screen,
+            left_x,
+            top_row_y,
+            button_width,
+            button_height,
+            self.preferences.text("about_title"),
+            button_font_size,
+        )
+        self.settings_buttons["donate"] = draw_outline_button(
+            self.screen,
+            right_x,
+            top_row_y,
+            button_width,
+            button_height,
+            self.preferences.text("donate_title"),
+            button_font_size,
+        )
+        self.settings_buttons["save"] = draw_outline_button(
+            self.screen,
+            left_x,
+            bottom_row_y,
+            button_width,
+            button_height,
+            self.preferences.text("save"),
+            button_font_size,
+        )
+        self.settings_buttons["exit"] = draw_outline_button(
+            self.screen,
+            right_x,
+            bottom_row_y,
+            button_width,
+            button_height,
+            self.preferences.text("exit"),
+            button_font_size,
+        )
+
+        if self.settings_dropdown_open:
+            option_height = int(language_rect.h * 0.86)
+            dropdown_rect = pygame.Rect(
+                language_rect.left,
+                language_rect.bottom + self.sy(6),
+                language_rect.w,
+                option_height * 2,
+            )
+            pygame.draw.rect(self.screen, WHITE, dropdown_rect, border_radius=max(10, dropdown_rect.h // 6))
+            pygame.draw.rect(
+                self.screen,
+                BORDER_PINK,
+                dropdown_rect,
+                width=max(2, self.sx(2)),
+                border_radius=max(10, dropdown_rect.h // 6),
+            )
+
+            option_font = get_ui_font(self.sf(20), bold=True)
+            for index, code in enumerate(("en", "vi")):
+                rect = pygame.Rect(
+                    dropdown_rect.left,
+                    dropdown_rect.top + option_height * index,
+                    dropdown_rect.w,
+                    option_height,
+                )
+                if code == self.settings_draft_language:
+                    pygame.draw.rect(self.screen, (255, 245, 250), rect)
+                if index > 0:
+                    pygame.draw.line(
+                        self.screen,
+                        BORDER_PINK,
+                        (rect.left, rect.top),
+                        (rect.right, rect.top),
+                        max(1, self.sx(1)),
+                    )
+                option_text = option_font.render(self.preferences.language_label(code), True, BLACK)
+                option_text_rect = option_text.get_rect(center=rect.center)
+                self.screen.blit(option_text, option_text_rect)
+                self.settings_buttons[f"language_{code}"] = rect
+
+    def _draw_about_modal(self):
+        panel_rect = self.make_centered_rect(0.68, 0.68, 0.08)
+        draw_decorated_panel(
+            self.screen,
+            panel_rect,
+            outer_width=max(3, self.sx(4)),
+            inner_margin=max(16, self.sx(20)),
+            inner_width=max(2, self.sx(2)),
+        )
+        header_font = get_ui_font(self.sf(42), bold=True)
+        draw_panel_header(self.screen, panel_rect, self.preferences.text("about_title"), header_font)
+
+        title_font = get_ui_font(self.sf(28), bold=True)
+        body_font = get_ui_font(self.sf(24), bold=True)
+        highlight_font = get_ui_font(self.sf(26), bold=True)
+
+        y = panel_rect.top + int(panel_rect.h * 0.24)
+
+        intro_lines = wrap_text(title_font, self.preferences.text("about_intro"), int(panel_rect.w * 0.80))
+        for line in intro_lines:
+            label = title_font.render(line, True, BLACK)
+            rect = label.get_rect(center=(panel_rect.centerx, y))
+            self.screen.blit(label, rect)
+            y += label.get_height() + self.sy(10)
+
+        y += self.sy(12)
+        for name in self.preferences.lines("about_names"):
+            label = body_font.render(name, True, BLACK)
+            rect = label.get_rect(center=(panel_rect.centerx, y))
+            self.screen.blit(label, rect)
+            y += label.get_height() + self.sy(14)
+
+        y += self.sy(20)
+        for line in wrap_text(highlight_font, self.preferences.text("about_highlight"), int(panel_rect.w * 0.86)):
+            label = highlight_font.render(line, True, (255, 42, 42))
+            rect = label.get_rect(center=(panel_rect.centerx, y))
+            self.screen.blit(label, rect)
+            y += label.get_height() + self.sy(10)
+
+        creator = highlight_font.render(self.preferences.text("about_creator"), True, (255, 42, 42))
+        creator_rect = creator.get_rect(center=(panel_rect.centerx, y + self.sy(6)))
+        self.screen.blit(creator, creator_rect)
+
+        button_width = max(130, panel_rect.w // 5)
+        button_height = max(58, panel_rect.h // 10)
+        button_x = panel_rect.centerx - button_width // 2
+        button_y = panel_rect.bottom - button_height - self.sy(42)
+        self.about_exit_button = draw_outline_button(
+            self.screen,
+            button_x,
+            button_y,
+            button_width,
+            button_height,
+            self.preferences.text("exit"),
+            self.sf(28),
+        )
+
+    def _draw_donate_modal(self):
+        panel_rect = self.make_centered_rect(0.64, 0.66, 0.08)
+        draw_decorated_panel(
+            self.screen,
+            panel_rect,
+            outer_width=max(3, self.sx(4)),
+            inner_margin=max(16, self.sx(20)),
+            inner_width=max(2, self.sx(2)),
+        )
+        header_font = get_ui_font(self.sf(42), bold=True)
+        draw_panel_header(self.screen, panel_rect, self.preferences.text("donate_title"), header_font)
+
+        qr_size = int(min(panel_rect.w * 0.50, panel_rect.h * 0.48))
+        qr_rect = pygame.Rect(0, 0, qr_size, qr_size)
+        qr_rect.center = (panel_rect.centerx, panel_rect.top + int(panel_rect.h * 0.44))
+        draw_qr_placeholder(self.screen, qr_rect)
+
+        button_width = max(130, panel_rect.w // 5)
+        button_height = max(58, panel_rect.h // 10)
+        button_x = panel_rect.centerx - button_width // 2
+        button_y = panel_rect.bottom - button_height - self.sy(42)
+        self.donate_exit_button = draw_outline_button(
+            self.screen,
+            button_x,
+            button_y,
+            button_width,
+            button_height,
+            self.preferences.text("exit"),
+            self.sf(28),
         )
 
     def _handle_settings_click(self, layout, mouse_pos):
-        rects = self._get_settings_rects(layout)
-        if not rects["panel"].collidepoint(mouse_pos):
-            self._close_settings_modal()
-            return
+        if self.settings_dropdown_open:
+            for code in ("en", "vi"):
+                rect = self.settings_buttons.get(f"language_{code}")
+                if rect and rect.collidepoint(mouse_pos):
+                    self.settings_draft_language = code
+                    self.settings_dropdown_open = False
+                    return None
 
-        if rects["english_button"].collidepoint(mouse_pos):
-            self.preferences.set_language("en")
+        language_box = self.settings_buttons.get("language_box")
+        if language_box and language_box.collidepoint(mouse_pos):
+            self.settings_dropdown_open = not self.settings_dropdown_open
+            return None
+
+        if self.settings_dropdown_open:
+            self.settings_dropdown_open = False
+
+        if self.settings_buttons.get("volume") and self.settings_buttons["volume"].collidepoint(mouse_pos):
+            self.settings_draft_volume = not self.settings_draft_volume
+            return None
+
+        if self.settings_buttons.get("about") and self.settings_buttons["about"].collidepoint(mouse_pos):
+            self._open_info_modal("about")
+            return None
+
+        if self.settings_buttons.get("donate") and self.settings_buttons["donate"].collidepoint(mouse_pos):
+            self._open_info_modal("donate")
+            return None
+
+        if self.settings_buttons.get("save") and self.settings_buttons["save"].collidepoint(mouse_pos):
+            self.preferences.set_language(self.settings_draft_language)
+            self.preferences.set_volume(self.settings_draft_volume)
             self.preferences.save()
-            return
-
-        if rects["vietnamese_button"].collidepoint(mouse_pos):
-            self.preferences.set_language("vi")
-            self.preferences.save()
-            return
-
-        if rects["close_button"].collidepoint(mouse_pos):
             self._close_settings_modal()
+            return None
+
+        if self.settings_buttons.get("exit") and self.settings_buttons["exit"].collidepoint(mouse_pos):
+            self._close_settings_modal()
+            return None
+
+        return None
+
+    def _handle_info_modal_click(self, mouse_pos):
+        if self.active_modal == "about":
+            if self.about_exit_button and self.about_exit_button.collidepoint(mouse_pos):
+                self._close_active_modal()
+            return None
+
+        if self.active_modal == "donate":
+            if self.donate_exit_button and self.donate_exit_button.collidepoint(mouse_pos):
+                self._close_active_modal()
+            return None
+
+        return None
 
     def _get_winner_popup_rects(self, layout):
-        dialog_width = max(320, int(360 * layout["scale"]))
-        dialog_height = max(330, int(360 * layout["scale"]))
-        dialog = pygame.Rect(
-            (layout["screen_width"] - dialog_width) // 2,
-            (layout["screen_height"] - dialog_height) // 2,
-            dialog_width,
-            dialog_height,
-        )
+        dialog = self.make_centered_rect(0.31, 0.52, 0.18)
 
-        button_width = max(118, int(126 * layout["scale"]))
-        button_height = max(46, int(50 * layout["scale"]))
-        gap = max(18, int(20 * layout["scale"]))
-        button_y = dialog.bottom - button_height - max(28, int(32 * layout["scale"]))
+        button_width = int(dialog.w * 0.34)
+        button_height = int(dialog.h * 0.14)
+        gap = int(dialog.w * 0.12)
+        button_y = dialog.bottom - int(dialog.h * 0.22)
         play_again_button = pygame.Rect(
             dialog.centerx - gap - button_width,
             button_y,
@@ -828,28 +1059,32 @@ class GamePage:
         rects = self._get_winner_popup_rects(layout)
         dialog = rects["dialog"]
 
-        draw_backdrop(self.screen, alpha=118)
-        draw_decorated_panel(self.screen, dialog)
+        draw_backdrop(self.screen, alpha=146)
+        draw_decorated_panel(
+            self.screen,
+            dialog,
+            outer_width=max(2, self.sx(3)),
+            inner_margin=max(14, self.sx(18)),
+            inner_width=max(1, self.sx(2)),
+        )
 
-        title_font = pygame.font.SysFont("timesnewroman", max(24, int(32 * layout["scale"])), bold=True)
-        reason_font = pygame.font.SysFont("segoeui", max(15, int(16 * layout["scale"])), bold=True)
-        big_font = pygame.font.SysFont("arialblack", max(54, int(74 * layout["scale"])), bold=True)
+        title_font = get_ui_font(self.sf(28), bold=True)
+        big_font = pygame.font.SysFont("arialblack", self.sf(92), bold=True)
+        button_font_size = self.sf(22 if self.preferences.language == "vi" else 24)
 
         title_surface = title_font.render(self._popup_title(), True, TEXT)
-        reason_surface = reason_font.render(self._popup_reason(), True, SUBTEXT)
-        title_y = dialog.top + max(42, int(46 * layout["scale"]))
-        word_y = dialog.centery - max(24, int(26 * layout["scale"]))
-        reason_y = dialog.centery + max(44, int(48 * layout["scale"]))
+        title_y = dialog.top + int(dialog.h * 0.15)
+        word_y = dialog.top + int(dialog.h * 0.48)
 
         self.screen.blit(title_surface, title_surface.get_rect(center=(dialog.centerx, title_y)))
         self._draw_outlined_text(
             self._popup_word(),
             big_font,
             self._popup_word_color(),
-            (115, 88, 171),
+            (98, 73, 155),
             (dialog.centerx, word_y),
+            max(2, self.sx(4)),
         )
-        self.screen.blit(reason_surface, reason_surface.get_rect(center=(dialog.centerx, reason_y)))
 
         draw_modal_button(
             self.screen,
@@ -858,8 +1093,8 @@ class GamePage:
             hovered=rects["play_again_button"].collidepoint(mouse_pos),
             fill_color=WHITE,
             border_color=BORDER_PINK,
-            text_color=TEXT,
-            font_size=max(16, int(17 * layout["scale"])),
+            text_color=BLACK,
+            font_size=button_font_size,
         )
         draw_modal_button(
             self.screen,
@@ -868,15 +1103,25 @@ class GamePage:
             hovered=rects["exit_button"].collidepoint(mouse_pos),
             fill_color=WHITE,
             border_color=BORDER_PINK,
-            text_color=TEXT,
-            font_size=max(16, int(17 * layout["scale"])),
+            text_color=BLACK,
+            font_size=button_font_size,
         )
 
-    def _draw_outlined_text(self, text, font, fill_color, outline_color, center):
+    def _draw_outlined_text(self, text, font, fill_color, outline_color, center, outline_width=3):
         outline_surface = font.render(text, True, outline_color)
         fill_surface = font.render(text, True, fill_color)
 
-        for dx, dy in [(-3, 0), (3, 0), (0, -3), (0, 3), (-2, -2), (2, 2), (-2, 2), (2, -2)]:
+        offsets = [
+            (-outline_width, 0),
+            (outline_width, 0),
+            (0, -outline_width),
+            (0, outline_width),
+            (-outline_width, -outline_width),
+            (outline_width, outline_width),
+            (-outline_width, outline_width),
+            (outline_width, -outline_width),
+        ]
+        for dx, dy in offsets:
             outline_rect = outline_surface.get_rect(center=(center[0] + dx, center[1] + dy))
             self.screen.blit(outline_surface, outline_rect)
 

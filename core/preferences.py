@@ -1,8 +1,15 @@
-from __future__ import annotations
-
 import json
 from pathlib import Path
 
+
+SETTINGS_FILE = Path(__file__).resolve().parent.parent / "settings.json"
+LEGACY_SETTINGS_FILE = Path(__file__).resolve().parent.parent / "preferences.json"
+SUPPORTED_LANGUAGES = ("en", "vi")
+
+LANGUAGE_NAMES = {
+    "en": "English",
+    "vi": "Tieng Viet",
+}
 
 TRANSLATIONS = {
     "en": {
@@ -12,27 +19,49 @@ TRANSLATIONS = {
         "rules": "RULES",
         "quit": "QUIT",
         "team_name": "TEAM 5",
+        "home_1player": "1 PLAYER",
+        "home_2players": "2 PLAYERS",
+        "home_rules": "RULES",
+        "home_quit": "QUIT",
         "settings_title": "SETTINGS",
-        "settings_language": "Language",
-        "settings_close": "CLOSE",
-        "settings_saved": "Changes apply immediately.",
+        "settings_volume": "VOLUME",
+        "settings_language": "LANGUAGE",
+        "settings_save": "SAVE",
+        "settings_close": "EXIT",
+        "settings_saved": "Changes are applied when you press Save.",
+        "about_title": "ABOUT",
+        "donate_title": "DONATE",
+        "save": "SAVE",
+        "exit": "EXIT",
+        "play_again": "PLAY AGAIN",
+        "yes": "YES",
+        "no": "NO",
+        "quit_prompt": "ARE YOU SURE YOU WANT TO QUIT ?",
         "language_en": "English",
         "language_vi": "Vietnamese",
         "rules_title": "HOW TO PLAY",
+        "rules_close": "EXIT",
         "rules_lines": [
-            "Players take turns dropping one disc into any non-full column.",
-            "The first side that connects 4 discs in a row wins.",
-            "A winning line can be horizontal, vertical, or diagonal.",
-            "In 1 Player mode you control Blue and the AI controls Yellow.",
-            "In 2 Players mode Blue moves first, then Yellow.",
+            "Players take turns dropping a piece into one of the columns.",
+            "On each turn, choose a column.",
+            "The piece falls to the lowest empty slot in that column.",
+            "You cannot place a piece in a full column.",
+            "Connect four matching pieces in a row, column, or diagonal to win.",
+            "If the board fills up and nobody connects four, the game is a draw.",
         ],
-        "rules_close": "BACK",
+        "about_intro": "Project Team 5, Artificial Intelligence, UTC.",
+        "about_highlight": "This game was first developed by",
+        "about_creator": "Howard Wexler",
+        "about_names": [
+            "Ta Bach Dat",
+            "Le Nhat Long",
+            "Nguyen Dieu Linh",
+        ],
         "levels": "LEVELS",
         "back_home": "BACK",
         "easy": "EASY",
         "medium": "MEDIUM",
         "hard": "HARD",
-        "exit": "EXIT",
         "turn_blue": "BLUE'S TURN",
         "turn_yellow": "YELLOW'S TURN",
         "turn_blue_wins": "BLUE WINS",
@@ -57,102 +86,133 @@ TRANSLATIONS = {
         "winner_draw": "DRAW",
         "winner_popup_win": "WIN",
         "winner_popup_draw": "DRAW",
-        "play_again": "PLAY AGAIN",
         "winner_reason_connect4": "4 discs connected",
         "winner_reason_timeout": "Win by time out",
         "winner_reason_draw": "No more valid moves",
     },
     "vi": {
         "app_title": "CONNECT 4",
-        "one_player": "1 NGUOI CHOI",
-        "two_players": "2 NGUOI CHOI",
-        "rules": "LUAT CHOI",
-        "quit": "THOAT",
-        "team_name": "NHOM 5",
-        "settings_title": "CAI DAT",
-        "settings_language": "Ngon ngu",
-        "settings_close": "DONG",
-        "settings_saved": "Ap dung ngay lap tuc.",
-        "language_en": "Tieng Anh",
-        "language_vi": "Tieng Viet",
-        "rules_title": "CACH CHOI",
+        "one_player": "1 NGƯỜI CHƠI",
+        "two_players": "2 NGƯỜI CHƠI",
+        "rules": "LUẬT CHƠI",
+        "quit": "THOÁT",
+        "team_name": "NHÓM 5",
+        "home_1player": "1 NGƯỜI CHƠI",
+        "home_2players": "2 NGƯỜI CHƠI",
+        "home_rules": "LUẬT CHƠI",
+        "home_quit": "THOÁT",
+        "settings_title": "CÀI ĐẶT",
+        "settings_volume": "ÂM THANH",
+        "settings_language": "NGÔN NGỮ",
+        "settings_save": "LƯU",
+        "settings_close": "THOÁT",
+        "settings_saved": "Nhấn Lưu để áp dụng.",
+        "about_title": "GIỚI THIỆU",
+        "donate_title": "ỦNG HỘ",
+        "save": "LƯU",
+        "exit": "THOÁT",
+        "play_again": "CHƠI LẠI",
+        "yes": "CÓ",
+        "no": "KHÔNG",
+        "quit_prompt": "BẠN CÓ CHẮC CHẮN MUỐN THOÁT KHÔNG?",
+        "language_en": "Tiếng Anh",
+        "language_vi": "Tiếng Việt",
+        "rules_title": "LUẬT CHƠI",
+        "rules_close": "THOÁT",
         "rules_lines": [
-            "Moi luot, nguoi choi tha 1 quan vao cot con trong.",
-            "Ben nao noi duoc 4 quan lien tiep se gianh chien thang.",
-            "4 quan co the nam ngang, doc hoac cheo.",
-            "Che do 1 nguoi choi: ban danh quan Xanh, AI danh quan Vang.",
-            "Che do 2 nguoi choi: quan Xanh di truoc, sau do den quan Vang.",
+            "Hai người lần lượt thay phiên nhau thả quân cờ vào các cột.",
+            "Mỗi lượt, bạn chọn một cột.",
+            "Quân cờ sẽ rơi xuống vị trí thấp nhất còn trống trong cột đó.",
+            "Bạn không thể đặt quân vào cột đã đầy.",
+            "Ai tạo được 4 quân cùng màu liên tiếp theo hàng ngang, dọc hoặc chéo trước sẽ thắng.",
+            "Bảng đầy và không có 4 quân liên tiếp thì hòa.",
         ],
-        "rules_close": "QUAY LAI",
-        "levels": "CAP DO",
-        "back_home": "QUAY LAI",
-        "easy": "DE",
-        "medium": "TRUNG BINH",
-        "hard": "KHO",
-        "exit": "THOAT",
-        "turn_blue": "LUOT XANH",
-        "turn_yellow": "LUOT VANG",
-        "turn_blue_wins": "XANH THANG",
-        "turn_yellow_wins": "VANG THANG",
-        "turn_draw": "HOA",
-        "footer_depth": "DO SAU {depth}",
-        "footer_timeout": "HET GIO",
-        "footer_connect4": "CONNECT 4",
-        "footer_draw": "HOA",
-        "footer_two_players": "2 NGUOI CHOI",
-        "player_you": "BAN",
+        "about_intro": "Project team 5 môn Trí tuệ nhân tạo, UTC.",
+        "about_highlight": "Trò chơi được phát triển lần đầu bởi",
+        "about_creator": "Howard Wexler",
+        "about_names": [
+            "Tạ Bách Đạt",
+            "Lê Nhật Long",
+            "Nguyễn Diệu Linh",
+        ],
+        "levels": "CẤP ĐỘ",
+        "back_home": "QUAY LẠI",
+        "easy": "DỄ",
+        "medium": "TRUNG BÌNH",
+        "hard": "KHÓ",
+        "turn_blue": "LƯỢT XANH",
+        "turn_yellow": "LƯỢT VÀNG",
+        "turn_blue_wins": "XANH THẮNG",
+        "turn_yellow_wins": "VÀNG THẮNG",
+        "turn_draw": "HÒA",
+        "footer_depth": "ĐỘ SÂU {depth}",
+        "footer_timeout": "HẾT GIỜ",
+        "footer_connect4": "NỐI 4",
+        "footer_draw": "HÒA",
+        "footer_two_players": "2 NGƯỜI CHƠI",
+        "player_you": "BẮN",
         "player_ai": "AI",
         "player_one": "N1",
         "player_two": "N2",
-        "reset_title": "Choi lai van hien tai?",
-        "reset_body": "Ban co se duoc xoa va dong ho tinh lai tu dau.",
-        "reset_keep": "CHOI TIEP",
+        "reset_title": "Chơi lại ván hiện tại?",
+        "reset_body": "Bàn cờ sẽ được xóa và đồng hồ sẽ được đặt lại.",
+        "reset_keep": "CHƠI TIẾP",
         "reset_confirm": "RESET",
-        "settings_button": "CAI DAT",
+        "settings_button": "CÀI ĐẶT",
         "winner_blue": "XANH",
-        "winner_yellow": "VANG",
-        "winner_draw": "HOA",
+        "winner_yellow": "VÀNG",
+        "winner_draw": "HÒA",
         "winner_popup_win": "WIN",
         "winner_popup_draw": "DRAW",
-        "play_again": "CHOI LAI",
-        "winner_reason_connect4": "Noi du 4 quan",
-        "winner_reason_timeout": "Thang do het gio",
-        "winner_reason_draw": "Khong con nuoc di hop le",
+        "winner_reason_connect4": "Nối đủ 4 quân",
+        "winner_reason_timeout": "Thắng do hết giờ",
+        "winner_reason_draw": "Không còn nước đi hợp lệ",
     },
 }
 
 
 class GamePreferences:
     def __init__(self, storage_path=None):
-        project_root = Path(__file__).resolve().parents[1]
-        self.storage_path = Path(storage_path) if storage_path else project_root / "preferences.json"
+        self.storage_path = Path(storage_path) if storage_path else SETTINGS_FILE
+        self.legacy_storage_path = LEGACY_SETTINGS_FILE
         self.language = "en"
+        self.volume_on = True
         self.load()
 
     def load(self):
-        if not self.storage_path.exists():
+        source = self.storage_path if self.storage_path.exists() else self.legacy_storage_path
+        if not source.exists():
             return
 
         try:
-            payload = json.loads(self.storage_path.read_text(encoding="utf-8"))
+            payload = json.loads(source.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return
 
         language = payload.get("language", "en")
-        if language in TRANSLATIONS:
+        if language in SUPPORTED_LANGUAGES:
             self.language = language
+        self.volume_on = bool(payload.get("volume_on", True))
 
     def save(self):
-        payload = {"language": self.language}
+        payload = {
+            "language": self.language,
+            "volume_on": self.volume_on,
+        }
         self.storage_path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
     def set_language(self, language):
-        if language not in TRANSLATIONS:
-            return
-        self.language = language
+        if language in SUPPORTED_LANGUAGES:
+            self.language = language
+
+    def set_volume(self, volume_on):
+        self.volume_on = bool(volume_on)
+
+    def toggle_volume(self):
+        self.volume_on = not self.volume_on
 
     def text(self, key):
         current = TRANSLATIONS.get(self.language, TRANSLATIONS["en"])
@@ -162,5 +222,14 @@ class GamePreferences:
     def format(self, key, **kwargs):
         return self.text(key).format(**kwargs)
 
+    def lines(self, key):
+        value = self.text(key)
+        if isinstance(value, list):
+            return list(value)
+        return [str(value)]
+
     def rules_lines(self):
-        return list(self.text("rules_lines"))
+        return self.lines("rules_lines")
+
+    def language_label(self, language_code):
+        return LANGUAGE_NAMES.get(language_code, language_code.upper())
