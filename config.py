@@ -1,0 +1,25 @@
+import pygame
+
+pygame.init()
+
+BASE_WIDTH = 1440
+BASE_HEIGHT = 1024
+
+# Kích thước cửa sổ khi mới mở, giống kiểu test.py
+WINDOW_WIDTH = 1000
+WINDOW_HEIGHT = 700
+
+BG_COLOR = (236, 236, 236)
+PINK = (199, 57, 138)
+LIGHT_PINK = (236, 168, 206)
+BORDER_PINK = (244, 180, 215)
+
+BLACK = (0, 0, 0)
+WHITE = (242, 242, 242)
+BLUE = (15, 100, 205)
+YELLOW = (236, 231, 120)
+
+TITLE_FONT_SIZE = 72
+BIG_FONT_SIZE = 42
+MEDIUM_FONT_SIZE = 34
+TEAM_FONT_SIZE = 56
