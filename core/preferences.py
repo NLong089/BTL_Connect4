@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pygame
+
 
 SETTINGS_FILE = Path(__file__).resolve().parent.parent / "settings.json"
 LEGACY_SETTINGS_FILE = Path(__file__).resolve().parent.parent / "preferences.json"
@@ -210,9 +212,20 @@ class GamePreferences:
 
     def set_volume(self, volume_on):
         self.volume_on = bool(volume_on)
+        self.apply_audio()
 
     def toggle_volume(self):
-        self.volume_on = not self.volume_on
+        self.set_volume(not self.volume_on)
+
+    def apply_audio(self):
+        if not pygame.mixer.get_init():
+            return
+
+        volume = 1.0 if self.volume_on else 0.0
+        try:
+            pygame.mixer.music.set_volume(volume)
+        except pygame.error:
+            pass
 
     def text(self, key):
         current = TRANSLATIONS.get(self.language, TRANSLATIONS["en"])

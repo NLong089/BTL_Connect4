@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import pygame
 import sys
 
@@ -10,6 +11,27 @@ from screens.game_page import GamePage
 
 os.environ["SDL_VIDEO_CENTERED"] = "1"
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+MUSIC_CANDIDATES = (
+    PROJECT_ROOT / "fragments.mp3",
+    PROJECT_ROOT.parent / "fragments.mp3",
+)
+
+
+def start_background_music(preferences):
+    music_path = next((path for path in MUSIC_CANDIDATES if path.exists()), None)
+    if music_path is None:
+        return
+
+    try:
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
+        pygame.mixer.music.load(str(music_path))
+        preferences.apply_audio()
+        pygame.mixer.music.play(-1)
+    except pygame.error:
+        pass
+
 def main():
     pygame.init()
 
@@ -17,6 +39,7 @@ def main():
     pygame.display.set_caption("Connect 4")
     clock = pygame.time.Clock()
     preferences = GamePreferences()
+    start_background_music(preferences)
 
     home_page = HomePage(screen, preferences)
     mode_select_page = ModeSelectPage(screen, preferences)
